@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>☕ Client-Side Java Compiler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0d1117;
+            color: #e6edf3;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 2rem;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        #app {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .subtitle {
+            color: #8b949e;
+            margin-bottom: 1.5rem;
+            border-left: 3px solid #f0883e;
+            padding-left: 1rem;
+        }
+
+        #editor-container {
+            background: #161b22;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        #javaCode {
+            width: 100%;
+            min-height: 280px;
+            background: #0d1117;
+            color: #e6edf3;
+            border: none;
+            padding: 1.2rem;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+            tab-size: 4;
+        }
+
+        #javaCode:focus {
+            box-shadow: inset 0 0 0 1px #58a6ff;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        #runBtn {
+            background: #238636;
+            color: #fff;
+            border: none;
+            padding: 0.7rem 2rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, opacity 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        #runBtn:hover:not(:disabled) {
+            background: #2ea043;
+        }
+
+        #runBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #21262d;
+            color: #8b949e;
+        }
+
+        #status {
+            color: #8b949e;
+            font-size: 0.95rem;
+        }
+
+        #output-container {
+            background: #161b22;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            overflow: hidden;
+        }
+
+        #output-container h3 {
+            padding: 0.8rem 1.2rem;
+            background: #0d1117;
+            border-bottom: 1px solid #30363d;
+            font-weight: 500;
+            font-size: 0.95rem;
+            color: #8b949e;
+        }
+
+        #output {
+            padding: 1.2rem;
+            margin: 0;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 100px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #0d1117;
+        }
+
+        .error {
+            color: #f85149;
+        }
+
+        .success {
+            color: #7ee787;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 1rem;
+            }
+            h1 {
+                font-size: 1.6rem;
+            }
+            #javaCode {
+                min-height: 200px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>☕ Java in the Browser</h1>
+        <div class="subtitle">
+            Compiles and runs entirely on your machine via WebAssembly — no server involved.
+        </div>
+
+        <div id="editor-container">
+            <textarea id="javaCode" spellcheck="false">public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+
+        // Try some basic Java features
+        int sum = 0;
+        for (int i = 1; i <= 5; i++) {
+            sum += i;
+        }
+        System.out.println("Sum of 1 to 5 is: " + sum);
+    }
+}</textarea>
+        </div>
+
+        <div class="toolbar">
+            <button id="runBtn" disabled>⏳ Loading Runtime...</button>
+            <span id="status">Initializing CheerpJ...</span>
+        </div>
+
+        <div id="output-container">
+            <h3>📤 Output</h3>
+            <pre id="output">Waiting for your code to run...</pre>
+        </div>
+    </div>
+
+    <!-- Load CheerpJ 3.0 from CDN -->
+    <script src="https://cdn.cheerpj.com/v3/cheerpj.js">
+    </script>
+
+    <script>
+        let cheerpjRunJava = null;
+
+        // Initialize CheerpJ (loads the WebAssembly JVM)
+        async function initCheerpJ() {
+            const statusEl = document.getElementById('status');
+            const btn = document.getElementById('runBtn');
+
+            try {
+                statusEl.textContent = 'Downloading WebAssembly runtime...';
+                const api = await CheerpjInit();
+                cheerpjRunJava = api.cheerpjRunJava;
+
+                statusEl.textContent = '✅ Ready!';
+                btn.disabled = false;
+                btn.innerHTML = '▶️ Compile & Run';
+            } catch (err) {
+                statusEl.textContent = '❌ Failed to load: ' + err.message;
+                document.getElementById('output').textContent =
+                    'Error initializing Java runtime:\n' + err.message;
+                console.error(err);
+            }
+        }
+
+        // Extract the public class name from source code
+        function extractClassName(code) {
+            const match = code.match(/public\s+class\s+(\w+)/);
+            return match ? match[1] : null;
+        }
+
+        // Handle the "Compile & Run" click
+        async function runJavaCode() {
+            const code = document.getElementById('javaCode').value;
+            const outputEl = document.getElementById('output');
+            const statusEl = document.getElementById('status');
+
+            if (!cheerpjRunJava) {
+                outputEl.textContent = 'Runtime not loaded yet. Please wait.';
+                return;
+            }
+
+            const className = extractClassName(code);
+            if (!className) {
+                outputEl.textContent = '❌ Error: Could not find a public class declaration.\n' +
+                    'Make sure your code contains something like:\n' +
+                    'public class MyClass { ... }';
+                return;
+            }
+
+            outputEl.textContent = '⏳ Compiling and running...';
+            statusEl.textContent = 'Compiling...';
+
+            try {
+                // CheerpJ compiles from source string and executes main()
+                const result = await cheerpjRunJava(code, className, []);
+
+                if (result && result.trim().length > 0) {
+                    outputEl.textContent = result;
+                } else {
+                    outputEl.textContent = '✅ Program executed successfully (no console output).';
+                }
+                statusEl.textContent = '✅ Done';
+            } catch (err) {
+                // Compilation or runtime error
+                outputEl.textContent = '❌ ' + err.message;
+                statusEl.textContent = '❌ Error';
+                console.error(err);
+            }
+        }
+
+        // Wire up the button
+        document.getElementById('runBtn').addEventListener('click', runJavaCode);
+
+        // Start loading CheerpJ as soon as the page loads
+        initCheerpJ();
+
+        // Allow Ctrl+Enter as a shortcut to run
+        document.getElementById('javaCode').addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                runJavaCode();
+            }
+        });
+    </script>
+</body>
+</html>
