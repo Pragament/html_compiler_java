@@ -162,7 +162,7 @@
 </head>
 <body>
     <div id="app">
-        <h1>☕ Java in the Browser</h1>
+        <h1>☕ Java in the Browser1</h1>
         <div class="subtitle">
             Compiles and runs entirely on your machine via WebAssembly — no server involved.
         </div>
@@ -182,7 +182,7 @@
 }</textarea>
         </div>
 
-        <div class="toolbar">
+        <div class="toolbar">i
             <button id="runBtn" disabled>⏳ Loading Runtime...</button>
             <span id="status">Initializing CheerpJ...</span>
         </div>
@@ -194,11 +194,10 @@
     </div>
 
     <!-- Load CheerpJ 3.0 from CDN -->
-    <script src="https://cdn.cheerpj.com/v3/cheerpj.js">
-    </script>
+    <script src="https://cjrtnc.leaningtech.com/4.2/loader.js"></script>
 
     <script>
-        let cheerpjRunJava = null;
+
 
         // Initialize CheerpJ (loads the WebAssembly JVM)
         async function initCheerpJ() {
@@ -207,9 +206,8 @@
 
             try {
                 statusEl.textContent = 'Downloading WebAssembly runtime...';
-                const api = await CheerpjInit();
-                cheerpjRunJava = api.cheerpjRunJava;
-
+                
+                 await cheerpjInit();
                 statusEl.textContent = '✅ Ready!';
                 btn.disabled = false;
                 btn.innerHTML = '▶️ Compile & Run';
@@ -233,10 +231,6 @@
             const outputEl = document.getElementById('output');
             const statusEl = document.getElementById('status');
 
-            if (!cheerpjRunJava) {
-                outputEl.textContent = 'Runtime not loaded yet. Please wait.';
-                return;
-            }
 
             const className = extractClassName(code);
             if (!className) {
@@ -251,16 +245,12 @@
 
             try {
                 // CheerpJ compiles from source string and executes main()
-                const result = await cheerpjRunJava(code, className, []);
-
-                if (result && result.trim().length > 0) {
-                    outputEl.textContent = result;
-                } else {
-                    outputEl.textContent = '✅ Program executed successfully (no console output).';
-                }
-                statusEl.textContent = '✅ Done';
-            } catch (err) {
+                outputEl.textContent =
+  "❌ This project uses the old CheerpJ 3 compiler API. The runtime now loads, but compile-from-text must be migrated for CheerpJ 4.";
+statusEl.textContent = "❌ Compiler API needs migration";
+return;
                 // Compilation or runtime error
+            } catch (err) {
                 outputEl.textContent = '❌ ' + err.message;
                 statusEl.textContent = '❌ Error';
                 console.error(err);
