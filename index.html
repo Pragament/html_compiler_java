@@ -3,8 +3,35 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>☕ Client-Side Java Compiler</title>
+    <title>☕ Client-Side Java IDE & Compiler</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        /* Design Tokens & Theme */
+        :root {
+            --bg-primary: #0a0b0e;
+            --bg-secondary: #0f1015;
+            --bg-tertiary: #171922;
+            --bg-accent: #212431;
+            --border-color: #252836;
+            --text-primary: #f0f1f4;
+            --text-secondary: #8e95ad;
+            --accent-color: #f0883e; /* Java orange */
+            --accent-hover: #f19a58;
+            --accent-glow: rgba(240, 136, 62, 0.25);
+            --success-color: #4ade80;
+            --error-color: #f87171;
+            --warning-color: #fbbf24;
+            --editor-bg: #111218;
+            --sidebar-dock-bg: #07080a;
+            --sidebar-panel-bg: #0f1015;
+            --tab-active-bg: #111218;
+            --tab-inactive-bg: #0d0e12;
+            --active-glow: 0 0 15px rgba(240, 136, 62, 0.35);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,262 +39,1906 @@
         }
 
         body {
-            background: #0d1117;
-            color: #e6edf3;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 2rem;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            overflow: hidden;
         }
 
-        #app {
-            max-width: 1000px;
-            width: 100%;
+        /* App Container Header */
+        header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(15, 16, 21, 0.85) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            backdrop-filter: blur(10px);
         }
 
-        h1 {
-            font-size: 2.2rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
+        .logo-section h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
+            background: linear-gradient(135deg, #fff 0%, #f0883e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
-            color: #8b949e;
-            margin-bottom: 1.5rem;
-            border-left: 3px solid #f0883e;
-            padding-left: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 1px;
         }
 
-        #editor-container {
-            background: #161b22;
-            border-radius: 8px;
-            border: 1px solid #30363d;
-            overflow: hidden;
-            margin-bottom: 1rem;
-        }
-
-        #javaCode {
-            width: 100%;
-            min-height: 280px;
-            background: #0d1117;
-            color: #e6edf3;
-            border: none;
-            padding: 1.2rem;
-            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-            font-size: 14px;
-            line-height: 1.6;
-            resize: vertical;
-            outline: none;
-            tab-size: 4;
-        }
-
-        #javaCode:focus {
-            box-shadow: inset 0 0 0 1px #58a6ff;
-        }
-
-        .toolbar {
+        .status-badge {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-            margin-bottom: 1.5rem;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
         }
 
-        #runBtn {
-            background: #238636;
-            color: #fff;
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--warning-color);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px var(--warning-color);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.ready {
+            background-color: var(--success-color);
+            box-shadow: 0 0 8px var(--success-color);
+        }
+
+        .status-dot.error {
+            background-color: var(--error-color);
+            box-shadow: 0 0 8px var(--error-color);
+        }
+
+        .status-dot.running {
+            background-color: #3b82f6;
+            box-shadow: 0 0 8px #3b82f6;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.6; }
+        }
+
+        /* Workspace Layout */
+        .workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 58px);
+            overflow: hidden;
+        }
+
+        /* Sidebar Dock (Icon Bar) */
+        .sidebar-dock {
+            width: 60px;
+            background-color: var(--sidebar-dock-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 15px;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+
+        .dock-item {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
             border: none;
-            padding: 0.7rem 2rem;
-            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dock-item:hover {
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+        }
+
+        .dock-item.active {
+            color: var(--accent-color);
+            background-color: rgba(240, 136, 62, 0.1);
+            border: 1px solid rgba(240, 136, 62, 0.25);
+            box-shadow: inset 0 0 4px rgba(240, 136, 62, 0.1);
+        }
+
+        /* Sidebar Panel (Panel content area) */
+        .sidebar-panel {
+            width: 280px;
+            background-color: var(--sidebar-panel-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .panel-content {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        .panel-content.active {
+            display: flex;
+        }
+
+        .panel-header {
+            padding: 1.2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h2 {
             font-size: 1rem;
             font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s, opacity 0.2s;
+            color: var(--text-primary);
+        }
+
+        .panel-header-vertical {
+            padding: 1.2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .panel-header-vertical h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* File Explorer */
+        .files-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .file-item {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+            user-select: none;
         }
 
-        #runBtn:hover:not(:disabled) {
-            background: #2ea043;
+        .file-item:hover {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
         }
 
-        #runBtn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background: #21262d;
-            color: #8b949e;
+        .file-item.active {
+            background-color: rgba(240, 136, 62, 0.08);
+            color: var(--text-primary);
+            border-color: rgba(240, 136, 62, 0.2);
+            font-weight: 500;
         }
 
-        #status {
-            color: #8b949e;
-            font-size: 0.95rem;
+        .file-name-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
-        #output-container {
-            background: #161b22;
-            border-radius: 8px;
-            border: 1px solid #30363d;
+        .file-actions {
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .file-item:hover .file-actions {
+            opacity: 1;
+        }
+
+        .btn-icon-only {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-icon-only:hover {
+            color: var(--error-color);
+            background-color: rgba(248, 113, 113, 0.1);
+        }
+
+        /* Snippets styling inside Panel */
+        .snippets-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .snippet-card {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .snippet-card:hover {
+            border-color: var(--accent-color);
+            background-color: var(--bg-accent);
+            transform: translateY(-1px);
+        }
+
+        .snippet-card.active {
+            border-color: var(--accent-color);
+            background-color: rgba(240, 136, 62, 0.05);
+            box-shadow: inset 0 0 0 1px var(--accent-color);
+        }
+
+        .snippet-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
+            color: var(--text-primary);
+        }
+
+        .snippet-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.3;
+        }
+
+        /* Settings View */
+        .settings-group {
+            padding: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .settings-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .settings-item label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .select-input {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .select-input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        .slider-input {
+            width: 100%;
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .settings-item-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .settings-item-checkbox input[type="checkbox"] {
+            accent-color: var(--accent-color);
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+        }
+
+        .settings-item-checkbox label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Main Workspace split editor/terminal */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--editor-bg);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Editor Pane */
+        .editor-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 150px;
+            position: relative;
+        }
+
+        .pane-header {
+            height: 40px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.2rem;
+            user-select: none;
+        }
+
+        /* Tabs UI */
+        .tabs-container {
+            display: flex;
+            align-items: flex-end;
+            height: 100%;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .tabs-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .editor-tab {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 14px;
+            height: 32px;
+            background-color: var(--tab-inactive-bg);
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            margin-right: 3px;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .editor-tab:hover {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .editor-tab.active {
+            background-color: var(--tab-active-bg);
+            color: var(--text-primary);
+            border-top: 2px solid var(--accent-color);
+            height: 34px;
+            font-weight: 500;
+        }
+
+        .tab-close {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+        }
+
+        .tab-close:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--error-color);
+        }
+
+        .editor-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
         }
 
-        #output-container h3 {
-            padding: 0.8rem 1.2rem;
-            background: #0d1117;
-            border-bottom: 1px solid #30363d;
-            font-weight: 500;
-            font-size: 0.95rem;
-            color: #8b949e;
+        /* Resizer UI */
+        .resizer-horizontal {
+            height: 4px;
+            background-color: var(--border-color);
+            cursor: row-resize;
+            transition: background-color 0.2s ease;
+            z-index: 100;
+            flex-shrink: 0;
         }
 
-        #output {
-            padding: 1.2rem;
+        .resizer-horizontal:hover, .resizer-horizontal.dragging {
+            background-color: var(--accent-color);
+        }
+
+        /* Terminal UI at bottom */
+        .terminal-pane {
+            height: 250px;
+            background-color: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            min-height: 80px;
+            max-height: 70vh;
+        }
+
+        .terminal-header {
+            height: 38px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.2rem;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .terminal-tabs {
+            display: flex;
+            gap: 4px;
+            height: 100%;
+            align-items: center;
+        }
+
+        .terminal-tab-btn {
+            background: transparent;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .terminal-tab-btn:hover {
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+        }
+
+        .terminal-tab-btn.active {
+            color: var(--text-primary);
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+        }
+
+        .badge {
+            background-color: var(--error-color);
+            color: #0d1117;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .badge:empty, .badge[data-count="0"] {
+            display: none;
+        }
+
+        .terminal-body {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            background-color: #0b0e14;
+        }
+
+        .terminal-tab-content {
+            display: none;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            padding: 1rem;
             margin: 0;
-            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-            font-size: 14px;
+        }
+
+        .terminal-tab-content.active {
+            display: block;
+        }
+
+        .terminal-output {
+            color: #7ee787;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 13px;
             line-height: 1.6;
             white-space: pre-wrap;
             word-break: break-word;
-            min-height: 100px;
-            max-height: 400px;
-            overflow-y: auto;
-            background: #0d1117;
         }
 
-        .error {
-            color: #f85149;
+        .terminal-output.empty {
+            color: var(--text-secondary);
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
-        .success {
-            color: #7ee787;
+        .terminal-output.error {
+            color: var(--error-color);
         }
 
-        @media (max-width: 600px) {
-            body {
-                padding: 1rem;
+        /* Problems panel list */
+        .problems-list {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .problems-list.active {
+            display: flex;
+        }
+
+        .problems-list.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .no-problems {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+        }
+
+        .problem-item {
+            background-color: rgba(248, 113, 113, 0.04);
+            border-left: 3px solid var(--error-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            border: 1px solid var(--border-color);
+            border-left-width: 3px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .problem-item:hover {
+            background-color: rgba(248, 113, 113, 0.08);
+        }
+
+        .problem-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            color: var(--error-color);
+        }
+
+        .problem-location {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .problem-message {
+            line-height: 1.4;
+            white-space: pre-wrap;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        /* Search input styling */
+        .search-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 12px 6px 30px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Buttons & Actions */
+        .btn {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            outline: none;
+        }
+
+        .btn:hover:not(:disabled) {
+            background-color: var(--bg-accent);
+            border-color: var(--text-secondary);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: #0d1117;
+            border: 1px solid var(--accent-color);
+            font-weight: 600;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+        }
+
+        .pane-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-accent);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-color);
+        }
+
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            .workspace {
+                flex-direction: column;
+                height: auto;
+                overflow-y: auto;
             }
-            h1 {
-                font-size: 1.6rem;
+            .sidebar-dock {
+                width: 100%;
+                height: 50px;
+                flex-direction: row;
+                justify-content: center;
+                padding-top: 0;
+                gap: 20px;
+                border-bottom: 1px solid var(--border-color);
+                border-right: none;
             }
-            #javaCode {
-                min-height: 200px;
-                font-size: 13px;
+            .sidebar-panel {
+                width: 100%;
+                height: 250px;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .main-area {
+                height: 600px;
             }
         }
     </style>
 </head>
 <body>
-    <div id="app">
-        <h1>☕ Java in the Browser1</h1>
-        <div class="subtitle">
-            Compiles and runs entirely on your machine via WebAssembly — no server involved.
+    <header>
+        <div class="logo-section">
+            <h1>☕ Java in the Browser</h1>
+            <div class="subtitle">Powered by WebAssembly — Zero Server Overhead</div>
+        </div>
+        <div class="status-badge">
+            <span id="status-dot" class="status-dot"></span>
+            <span id="status-text">Initializing CheerpJ...</span>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <!-- Sidebar Dock (icons) -->
+        <div class="sidebar-dock">
+            <button class="dock-item active" data-panel="explorer" title="File Explorer">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            </button>
+            <button class="dock-item" data-panel="snippets" title="Code Snippets">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            </button>
+            <button class="dock-item" data-panel="settings" title="Settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
         </div>
 
-        <div id="editor-container">
-            <textarea id="javaCode" spellcheck="false">public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
+        <!-- Sidebar Content Panel -->
+        <div class="sidebar-panel">
+            <!-- Explorer Panel -->
+            <div class="panel-content active" id="panel-explorer">
+                <div class="panel-header">
+                    <h2>Explorer</h2>
+                    <button class="btn btn-sm btn-primary" id="newFileBtn" title="Create New Java File">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        New File
+                    </button>
+                </div>
+                <div class="files-list" id="files-list">
+                    <!-- Java files listed here dynamically -->
+                </div>
+            </div>
 
-        // Try some basic Java features
-        int sum = 0;
-        for (int i = 1; i <= 5; i++) {
-            sum += i;
-        }
-        System.out.println("Sum of 1 to 5 is: " + sum);
-    }
-}</textarea>
+            <!-- Snippets Panel -->
+            <div class="panel-content" id="panel-snippets">
+                <div class="panel-header-vertical">
+                    <h2>Code Snippets</h2>
+                    <div class="search-container">
+                        <span class="search-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        </span>
+                        <input type="text" id="search-input" class="search-input" placeholder="Search snippets..." autocomplete="off" />
+                    </div>
+                </div>
+                <div class="snippets-list" id="snippets-list">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Settings Panel -->
+            <div class="panel-content" id="panel-settings">
+                <div class="panel-header">
+                    <h2>Settings</h2>
+                </div>
+                <div class="settings-group">
+                    <div class="settings-item">
+                        <label for="editor-theme">Editor Theme</label>
+                        <select id="editor-theme" class="select-input">
+                            <option value="vs-dark">VS Dark</option>
+                            <option value="dracula">Dracula</option>
+                            <option value="one-dark">One Dark</option>
+                            <option value="hc-black">High Contrast</option>
+                        </select>
+                    </div>
+                    <div class="settings-item">
+                        <label for="font-size-slider">Font Size (<span id="font-size-val">14</span>px)</label>
+                        <input type="range" id="font-size-slider" min="12" max="24" value="14" class="slider-input" />
+                    </div>
+                    <div class="settings-item-checkbox">
+                        <input type="checkbox" id="auto-compile-toggle" checked />
+                        <label for="auto-compile-toggle">Shortcut (Ctrl+Enter) to Run</label>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="toolbar">i
-            <button id="runBtn" disabled>⏳ Loading Runtime...</button>
-            <span id="status">Initializing CheerpJ...</span>
-        </div>
+        <!-- Main Workspace Area (Editor + Bottom Terminal) -->
+        <div class="main-area">
+            <!-- Editor Pane -->
+            <div class="editor-pane">
+                <div class="pane-header">
+                    <div class="tabs-container" id="editor-tabs">
+                        <!-- Open tabs will show here -->
+                    </div>
+                    <div class="pane-actions">
+                        <button id="runBtn" class="btn btn-primary" disabled>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            Compile & Run
+                        </button>
+                    </div>
+                </div>
+                <div id="editor-container" class="editor-container">
+                    <!-- Monaco Editor Mounts Here -->
+                </div>
+            </div>
 
-        <div id="output-container">
-            <h3>📤 Output</h3>
-            <pre id="output">Waiting for your code to run...</pre>
+            <!-- Resizer -->
+            <div class="resizer-horizontal" id="terminal-resizer"></div>
+
+            <!-- Terminal Pane -->
+            <div class="terminal-pane" id="terminal-pane">
+                <div class="terminal-header">
+                    <div class="terminal-tabs">
+                        <button class="terminal-tab-btn active" data-tab="output">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                            Output
+                        </button>
+                        <button class="terminal-tab-btn" data-tab="problems" id="problems-tab-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            Problems <span class="badge" id="problems-count">0</span>
+                        </button>
+                        <button class="terminal-tab-btn" data-tab="compiler-logs">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            Raw Compiler Logs
+                        </button>
+                    </div>
+                    <div class="pane-actions">
+                        <button id="clearBtn" class="btn btn-sm">Clear</button>
+                        <button id="copyBtn" class="btn btn-sm">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="terminal-body">
+                    <!-- Output Tab -->
+                    <pre id="output" class="terminal-tab-content active terminal-output empty">Initializing the environment...</pre>
+                    <!-- Problems Tab -->
+                    <div id="problems-panel" class="terminal-tab-content problems-list empty">
+                        <div class="no-problems">No problems have been detected in the workspace.</div>
+                    </div>
+                    <!-- Compiler Logs Tab -->
+                    <pre id="compiler-logs" class="terminal-tab-content terminal-output empty">No compilation logs yet.</pre>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Load CheerpJ 3.0 from CDN -->
+    <!-- Monaco Editor AMD Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+    <!-- CheerpJ Loader -->
     <script src="https://cjrtnc.leaningtech.com/4.2/loader.js"></script>
 
     <script>
+        // Snippets data
+        const snippets = [
+            {
+                id: "hello-world",
+                name: "👋 Hello World",
+                description: "Classic starting program that prints a greeting.",
+                code: `public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}`
+            },
+            {
+                id: "fibonacci",
+                name: "🌀 Fibonacci Series",
+                description: "Generates the Fibonacci sequence up to N numbers.",
+                code: `public class Fibonacci {
+    public static void main(String[] args) {
+        int n = 10;
+        int firstTerm = 0, secondTerm = 1;
+        System.out.println("Fibonacci Series up to " + n + " terms:");
+        for (int i = 1; i <= n; ++i) {
+            System.out.print(firstTerm + (i < n ? ", " : ""));
+            int nextTerm = firstTerm + secondTerm;
+            firstTerm = secondTerm;
+            secondTerm = nextTerm;
+        }
+        System.out.println();
+    }
+}`
+            },
+            {
+                id: "bubble-sort",
+                name: "📊 Bubble Sort",
+                description: "Sorts an array in ascending order.",
+                code: `import java.util.Arrays;
 
+public class BubbleSort {
+    public static void main(String[] args) {
+        int[] arr = {64, 34, 25, 12, 22, 11, 90};
+        System.out.println("Original array: " + Arrays.toString(arr));
+        
+        int n = arr.length;
+        for (int i = 0; i < n-1; i++) {
+            for (int j = 0; j < n-i-1; j++) {
+                if (arr[j] > arr[j+1]) {
+                    int temp = arr[j];
+                    arr[j] = arr[j+1];
+                    arr[j+1] = temp;
+                }
+            }
+        }
+        System.out.println("Sorted array:   " + Arrays.toString(arr));
+    }
+}`
+            },
+            {
+                id: "prime-checker",
+                name: "🔢 Prime Checker",
+                description: "Checks if a number is prime or not.",
+                code: `public class PrimeChecker {
+    public static void main(String[] args) {
+        int num = 29;
+        boolean isPrime = true;
+        
+        for (int i = 2; i <= num / 2; ++i) {
+            if (num % i == 0) {
+                isPrime = false;
+                break;
+            }
+        }
+        
+        if (isPrime) {
+            System.out.println(num + " is a prime number.");
+        } else {
+            System.out.println(num + " is not a prime number.");
+        }
+    }
+}`
+            },
+            {
+                id: "factorial",
+                name: "📈 Factorial Generator",
+                description: "Calculates the factorial of a number.",
+                code: `public class Factorial {
+    public static void main(String[] args) {
+        int num = 5;
+        long factorial = 1;
+        
+        for (int i = 1; i <= num; ++i) {
+            factorial *= i;
+        }
+        
+        System.out.println("Factorial of " + num + " is: " + factorial);
+    }
+}`
+            },
+            {
+                id: "binary-search",
+                name: "🔍 Binary Search",
+                description: "Finds the index of a value in a sorted array.",
+                code: `public class BinarySearch {
+    public static void main(String[] args) {
+        int[] arr = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};
+        int target = 23;
+        
+        int left = 0, right = arr.length - 1;
+        int index = -1;
+        
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            if (arr[mid] == target) {
+                index = mid;
+                break;
+            }
+            if (arr[mid] < target) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+        
+        if (index != -1) {
+            System.out.println("Element " + target + " found at index " + index);
+        } else {
+            System.out.println("Element " + target + " not found in array");
+        }
+    }
+}`
+            }
+        ];
 
-        // Initialize CheerpJ (loads the WebAssembly JVM)
+        let editorInstance = null;
+        let files = [];
+        let openTabs = [];
+        let activeFileName = "";
+        const fileModels = {};
+        let activeProblems = [];
+        let rawLogsBuffer = "";
+
+        // Default files loaded on first visit
+        const defaultFiles = [
+            {
+                name: "Main.java",
+                code: `public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}`
+            },
+            {
+                name: "Fibonacci.java",
+                code: `public class Fibonacci {
+    public static void main(String[] args) {
+        int n = 10;
+        int firstTerm = 0, secondTerm = 1;
+        System.out.println("Fibonacci Series up to " + n + " terms:");
+        for (int i = 1; i <= n; ++i) {
+            System.out.print(firstTerm + (i < n ? ", " : ""));
+            int nextTerm = firstTerm + secondTerm;
+            firstTerm = secondTerm;
+            secondTerm = nextTerm;
+        }
+        System.out.println();
+    }
+}`
+            },
+            {
+                name: "BubbleSort.java",
+                code: `import java.util.Arrays;
+
+public class BubbleSort {
+    public static void main(String[] args) {
+        int[] arr = {64, 34, 25, 12, 22, 11, 90};
+        System.out.println("Original array: " + Arrays.toString(arr));
+        
+        int n = arr.length;
+        for (int i = 0; i < n-1; i++) {
+            for (int j = 0; j < n-i-1; j++) {
+                if (arr[j] > arr[j+1]) {
+                    int temp = arr[j];
+                    arr[j] = arr[j+1];
+                    arr[j+1] = temp;
+                }
+            }
+        }
+        System.out.println("Sorted array:   " + Arrays.toString(arr));
+    }
+}`
+            }
+        ];
+
+        // Panel Switcher
+        const dockItems = document.querySelectorAll('.dock-item');
+        const panelContents = document.querySelectorAll('.panel-content');
+
+        dockItems.forEach(item => {
+            item.addEventListener('click', () => {
+                dockItems.forEach(d => d.classList.remove('active'));
+                item.classList.add('active');
+                
+                const targetPanel = item.getAttribute('data-panel');
+                panelContents.forEach(panel => {
+                    if (panel.id === `panel-${targetPanel}`) {
+                        panel.classList.add('active');
+                    } else {
+                        panel.classList.remove('active');
+                    }
+                });
+            });
+        });
+
+        // Settings Elements
+        const themeSelect = document.getElementById('editor-theme');
+        const fontSlider = document.getElementById('font-size-slider');
+        const fontVal = document.getElementById('font-size-val');
+        const autoCompileToggle = document.getElementById('auto-compile-toggle');
+
+        themeSelect.addEventListener('change', (e) => {
+            const theme = e.target.value;
+            if (editorInstance) {
+                monaco.editor.setTheme(theme);
+            }
+            localStorage.setItem('java_ide_theme', theme);
+        });
+
+        fontSlider.addEventListener('input', (e) => {
+            const size = parseInt(e.target.value, 10);
+            fontVal.textContent = size;
+            if (editorInstance) {
+                editorInstance.updateOptions({ fontSize: size });
+            }
+            localStorage.setItem('java_ide_font_size', size);
+        });
+
+        // Monaco Config
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            // Define custom Dracula Theme
+            monaco.editor.defineTheme('dracula', {
+                base: 'vs-dark',
+                inherit: true,
+                rules: [
+                    { token: 'comment', foreground: '6272a4', fontStyle: 'italic' },
+                    { token: 'keyword', foreground: 'ff79c6' },
+                    { token: 'identifier', foreground: 'f8f8f2' },
+                    { token: 'string', foreground: 'f1fa8c' },
+                    { token: 'number', foreground: 'bd93f9' },
+                    { token: 'type', foreground: '8be9fd', fontStyle: 'italic' },
+                    { token: 'class', foreground: '50fa7b' }
+                ],
+                colors: {
+                    'editor.background': '#1e1f29',
+                    'editor.foreground': '#f8f8f2',
+                    'editor.lineHighlightBackground': '#44475a30',
+                    'editorCursor.foreground': '#f8f8f0',
+                    'editor.selectionBackground': '#44475a'
+                }
+            });
+
+            // Define custom One Dark Theme
+            monaco.editor.defineTheme('one-dark', {
+                base: 'vs-dark',
+                inherit: true,
+                rules: [
+                    { token: 'comment', foreground: '5c6370', fontStyle: 'italic' },
+                    { token: 'keyword', foreground: 'c678dd' },
+                    { token: 'string', foreground: '98c379' },
+                    { token: 'number', foreground: 'd19a66' },
+                    { token: 'type', foreground: 'e5c07b' },
+                    { token: 'class', foreground: 'e5c07b' }
+                ],
+                colors: {
+                    'editor.background': '#282c34',
+                    'editor.foreground': '#abb2bf',
+                    'editor.lineHighlightBackground': '#2c313c',
+                    'editorCursor.foreground': '#528bff',
+                    'editor.selectionBackground': '#3e4451'
+                }
+            });
+
+            // Load settings
+            const savedTheme = localStorage.getItem('java_ide_theme') || 'vs-dark';
+            const savedFontSize = parseInt(localStorage.getItem('java_ide_font_size') || '14', 10);
+            
+            themeSelect.value = savedTheme;
+            fontSlider.value = savedFontSize;
+            fontVal.textContent = savedFontSize;
+
+            // Load files
+            let loadedFiles = localStorage.getItem('java_ide_files');
+            if (loadedFiles) {
+                files = JSON.parse(loadedFiles);
+            } else {
+                files = defaultFiles;
+                localStorage.setItem('java_ide_files', JSON.stringify(files));
+            }
+            
+            activeFileName = files[0].name;
+            openTabs = files.map(f => f.name);
+
+            // Initialize Explorer and Tabs
+            renderFilesList();
+            renderTabs();
+
+            // Set Editor Model
+            const activeFile = files.find(f => f.name === activeFileName);
+            const activeModel = getOrCreateModel(activeFileName, activeFile.code);
+
+            editorInstance = monaco.editor.create(document.getElementById('editor-container'), {
+                model: activeModel,
+                theme: savedTheme,
+                automaticLayout: true,
+                fontSize: savedFontSize,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                readOnly: false,
+                padding: { top: 12 }
+            });
+        });
+
+        // Model Management
+        function getOrCreateModel(filename, code) {
+            if (fileModels[filename]) {
+                return fileModels[filename];
+            }
+            const uri = monaco.Uri.file('/' + filename);
+            const model = monaco.editor.createModel(code, 'java', uri);
+            
+            model.onDidChangeContent(() => {
+                const updatedCode = model.getValue();
+                updateFileCode(filename, updatedCode);
+            });
+            
+            fileModels[filename] = model;
+            return model;
+        }
+
+        function updateFileCode(filename, newCode) {
+            const file = files.find(f => f.name === filename);
+            if (file) {
+                file.code = newCode;
+                localStorage.setItem('java_ide_files', JSON.stringify(files));
+            }
+        }
+
+        // Render functions
+        function renderFilesList() {
+            const listEl = document.getElementById('files-list');
+            listEl.innerHTML = '';
+            
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = `file-item ${file.name === activeFileName ? 'active' : ''}`;
+                
+                fileItem.innerHTML = `
+                    <div class="file-name-container">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        <span>${file.name}</span>
+                    </div>
+                    <div class="file-actions">
+                        <button class="btn-icon-only delete-file-btn" data-filename="${file.name}" title="Delete File">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                `;
+                
+                fileItem.addEventListener('click', (e) => {
+                    if (e.target.closest('.delete-file-btn')) {
+                        e.stopPropagation();
+                        deleteFile(file.name);
+                    } else {
+                        switchToFile(file.name);
+                    }
+                });
+                
+                listEl.appendChild(fileItem);
+            });
+        }
+
+        function renderTabs() {
+            const tabsContainer = document.getElementById('editor-tabs');
+            tabsContainer.innerHTML = '';
+            
+            openTabs.forEach(filename => {
+                const tab = document.createElement('div');
+                tab.className = `editor-tab ${filename === activeFileName ? 'active' : ''}`;
+                tab.innerHTML = `
+                    <span>${filename}</span>
+                    <span class="tab-close" data-filename="${filename}">&times;</span>
+                `;
+                tab.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('tab-close')) {
+                        e.stopPropagation();
+                        closeFile(filename);
+                    } else {
+                        switchToFile(filename);
+                    }
+                });
+                tabsContainer.appendChild(tab);
+            });
+        }
+
+        // Switch, close, delete, create files
+        function switchToFile(filename) {
+            activeFileName = filename;
+            
+            if (!openTabs.includes(filename)) {
+                openTabs.push(filename);
+            }
+            
+            const file = files.find(f => f.name === filename);
+            if (file && editorInstance) {
+                const model = getOrCreateModel(filename, file.code);
+                editorInstance.setModel(model);
+            }
+            
+            renderTabs();
+            renderFilesList();
+        }
+
+        function closeFile(filename) {
+            openTabs = openTabs.filter(name => name !== filename);
+            
+            if (activeFileName === filename) {
+                if (openTabs.length > 0) {
+                    switchToFile(openTabs[openTabs.length - 1]);
+                } else {
+                    activeFileName = "";
+                    if (editorInstance) {
+                        editorInstance.setModel(null);
+                    }
+                }
+            } else {
+                renderTabs();
+            }
+        }
+
+        function deleteFile(filename) {
+            if (files.length <= 1) {
+                alert("Cannot delete the only file in your workspace!");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete ${filename}?`)) {
+                files = files.filter(f => f.name !== filename);
+                localStorage.setItem('java_ide_files', JSON.stringify(files));
+                
+                if (fileModels[filename]) {
+                    fileModels[filename].dispose();
+                    delete fileModels[filename];
+                }
+                
+                openTabs = openTabs.filter(name => name !== filename);
+                
+                if (activeFileName === filename) {
+                    switchToFile(files[0].name);
+                } else {
+                    renderTabs();
+                    renderFilesList();
+                }
+            }
+        }
+
+        document.getElementById('newFileBtn').addEventListener('click', () => {
+            let className = prompt("Enter class name (e.g. MyClass):");
+            if (!className) return;
+            
+            className = className.trim();
+            if (className.toLowerCase().endsWith(".java")) {
+                className = className.substring(0, className.length - 5);
+            }
+            
+            if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(className)) {
+                alert("Invalid Java class name!");
+                return;
+            }
+            
+            const filename = className + ".java";
+            
+            if (files.some(f => f.name.toLowerCase() === filename.toLowerCase())) {
+                alert("A file with this name already exists!");
+                return;
+            }
+            
+            const newCode = `public class ${className} {
+    public static void main(String[] args) {
+        System.out.println("Hello from ${className}!");
+    }
+}`;
+            
+            files.push({ name: filename, code: newCode });
+            localStorage.setItem('java_ide_files', JSON.stringify(files));
+            
+            switchToFile(filename);
+        });
+
+        // Snippets List click handler
+        const searchInput = document.getElementById('search-input');
+        const snippetsList = document.getElementById('snippets-list');
+
+        function renderSnippets(filter = "") {
+            snippetsList.innerHTML = "";
+            const filtered = snippets.filter(s => 
+                s.name.toLowerCase().includes(filter.toLowerCase()) || 
+                s.description.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            if (filtered.length === 0) {
+                snippetsList.innerHTML = '<div class="snippet-desc" style="text-align:center;padding:1rem;">No matching snippets</div>';
+                return;
+            }
+
+            filtered.forEach(s => {
+                const card = document.createElement('div');
+                card.className = "snippet-card";
+                card.innerHTML = `
+                    <div class="snippet-name">${s.name}</div>
+                    <div class="snippet-desc">${s.description}</div>
+                `;
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.snippet-card').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    
+                    const classMatch = s.code.match(/public\s+class\s+(\w+)/);
+                    const className = classMatch ? classMatch[1] : s.id;
+                    const filename = className + ".java";
+                    
+                    const existingFile = files.find(f => f.name.toLowerCase() === filename.toLowerCase());
+                    if (existingFile) {
+                        if (confirm(`File ${filename} already exists. Do you want to overwrite its content with the default snippet?`)) {
+                            const model = getOrCreateModel(existingFile.name, s.code);
+                            model.setValue(s.code);
+                            switchToFile(existingFile.name);
+                        } else {
+                            switchToFile(existingFile.name);
+                        }
+                    } else {
+                        files.push({ name: filename, code: s.code });
+                        localStorage.setItem('java_ide_files', JSON.stringify(files));
+                        switchToFile(filename);
+                    }
+                });
+                snippetsList.appendChild(card);
+            });
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            renderSnippets(e.target.value);
+        });
+
+        renderSnippets();
+
+        // Terminal Output Formatting
+        const outputEl = document.getElementById('output');
+        
+        function setTerminalText(text, isError = false, isEmpty = false) {
+            outputEl.textContent = text;
+            outputEl.className = 'terminal-tab-content terminal-output active';
+            if (isError) outputEl.classList.add('error');
+            if (isEmpty) outputEl.classList.add('empty');
+        }
+
+        function appendTerminalText(text) {
+            outputEl.classList.remove('empty');
+            outputEl.textContent += text;
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+
+        function appendRawLog(text) {
+            rawLogsBuffer += text;
+            const compilerLogsEl = document.getElementById('compiler-logs');
+            compilerLogsEl.textContent = rawLogsBuffer;
+            compilerLogsEl.classList.remove('empty');
+            compilerLogsEl.scrollTop = compilerLogsEl.scrollHeight;
+        }
+
+        // Initialize CheerpJ
         async function initCheerpJ() {
-            const statusEl = document.getElementById('status');
-            const btn = document.getElementById('runBtn');
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            const runBtn = document.getElementById('runBtn');
 
             try {
-                statusEl.textContent = 'Downloading WebAssembly runtime...';
+                statusText.textContent = 'Downloading WebAssembly JRE...';
+                statusDot.className = 'status-dot running';
                 
-                 await cheerpjInit();
-                statusEl.textContent = '✅ Ready!';
-                btn.disabled = false;
-                btn.innerHTML = '▶️ Compile & Run';
+                await cheerpjInit();
+                
+                statusText.textContent = 'Java Runtime Ready';
+                statusDot.className = 'status-dot ready';
+                runBtn.disabled = false;
+                setTerminalText("Ready to compile and run Java programs.", false, false);
             } catch (err) {
-                statusEl.textContent = '❌ Failed to load: ' + err.message;
-                document.getElementById('output').textContent =
-                    'Error initializing Java runtime:\n' + err.message;
+                statusText.textContent = 'Failed to Initialize JRE';
+                statusDot.className = 'status-dot error';
+                setTerminalText('Error initializing CheerpJ:\n' + err.message, true);
                 console.error(err);
             }
         }
 
-        // Extract the public class name from source code
         function extractClassName(code) {
             const match = code.match(/public\s+class\s+(\w+)/);
             return match ? match[1] : null;
         }
 
-        // Handle the "Compile & Run" click
-        async function runJavaCode() {
-            const code = document.getElementById('javaCode').value;
-            const outputEl = document.getElementById('output');
-            const statusEl = document.getElementById('status');
+        // Console Interception
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
 
+        function startInterceptingConsole() {
+            const filterLogs = (text) => {
+                const lower = text.toLowerCase();
+                return (
+                    lower.startsWith("cheerpj:") ||
+                    lower.startsWith("cheerpj ") ||
+                    lower.includes("cheerpj runtime ready") ||
+                    lower.includes("class is loaded, main is starting") ||
+                    lower.includes("unable to access iframe") ||
+                    lower.includes("unable to get page bounds")
+                );
+            };
+
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                const text = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ");
+                appendRawLog(text + "\n");
+                if (filterLogs(text)) return;
+                appendTerminalText(text + "\n");
+            };
+            console.error = function(...args) {
+                originalError.apply(console, args);
+                const text = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ");
+                appendRawLog(text + "\n");
+                if (filterLogs(text)) return;
+                appendTerminalText(text + "\n");
+            };
+            console.warn = function(...args) {
+                originalWarn.apply(console, args);
+                const text = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(" ");
+                appendRawLog(text + "\n");
+                if (filterLogs(text)) return;
+                appendTerminalText(text + "\n");
+            };
+        }
+
+        function stopInterceptingConsole() {
+            console.log = originalLog;
+            console.error = originalError;
+            console.warn = originalWarn;
+        }
+
+        // Compiler error parser
+        function parseCompilerErrors(logs) {
+            const problems = [];
+            const blocks = logs.split("----------");
+            
+            blocks.forEach(block => {
+                const errorMatch = block.match(/(\d+)\.\s+(ERROR|WARNING)\s+in\s+([^\s]+)\s+\(at\s+line\s+(\d+)\)/i);
+                if (errorMatch) {
+                    const idx = errorMatch[1];
+                    const severity = errorMatch[2].toUpperCase();
+                    const filePath = errorMatch[3];
+                    const line = parseInt(errorMatch[4], 10);
+                    
+                    const lines = block.trim().split("\n");
+                    let message = "";
+                    if (lines.length > 0) {
+                        message = lines[lines.length - 1].trim();
+                    }
+                    
+                    const filename = filePath.split("/").pop();
+                    
+                    problems.push({
+                        index: idx,
+                        severity: severity,
+                        filename: filename,
+                        line: line,
+                        message: message
+                    });
+                }
+            });
+            
+            return problems;
+        }
+
+        function renderProblems() {
+            const panel = document.getElementById('problems-panel');
+            const countBadge = document.getElementById('problems-count');
+            
+            panel.innerHTML = '';
+            countBadge.textContent = activeProblems.length;
+            countBadge.setAttribute('data-count', activeProblems.length);
+            
+            if (activeProblems.length === 0) {
+                panel.className = 'terminal-tab-content problems-list empty';
+                panel.innerHTML = '<div class="no-problems">No problems have been detected in the workspace.</div>';
+                
+                files.forEach(file => {
+                    const model = fileModels[file.name];
+                    if (model) {
+                        monaco.editor.setModelMarkers(model, "compiler", []);
+                    }
+                });
+                return;
+            }
+            
+            panel.className = 'terminal-tab-content problems-list active';
+            const problemsByFile = {};
+            
+            activeProblems.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'problem-item';
+                item.innerHTML = `
+                    <div class="problem-header">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span>${p.severity}: ${p.message}</span>
+                    </div>
+                    <div class="problem-location">${p.filename} [Line ${p.line}]</div>
+                `;
+                
+                item.addEventListener('click', () => {
+                    switchToFile(p.filename);
+                    if (editorInstance) {
+                        editorInstance.revealLineInCenter(p.line);
+                        editorInstance.setPosition({ lineNumber: p.line, column: 1 });
+                        editorInstance.focus();
+                    }
+                });
+                
+                panel.appendChild(item);
+                
+                if (!problemsByFile[p.filename]) {
+                    problemsByFile[p.filename] = [];
+                }
+                problemsByFile[p.filename].push({
+                    startLineNumber: p.line,
+                    endLineNumber: p.line,
+                    startColumn: 1,
+                    endColumn: 1000,
+                    message: p.message,
+                    severity: p.severity === 'ERROR' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning
+                });
+            });
+            
+            files.forEach(file => {
+                const model = fileModels[file.name];
+                if (model) {
+                    const markers = problemsByFile[file.name] || [];
+                    monaco.editor.setModelMarkers(model, "compiler", markers);
+                }
+            });
+        }
+
+        // Terminal Tabs
+        const tabBtns = document.querySelectorAll('.terminal-tab-btn');
+        const tabContents = document.querySelectorAll('.terminal-tab-content');
+
+        function switchTerminalTab(tabId) {
+            tabBtns.forEach(btn => {
+                if (btn.getAttribute('data-tab') === tabId) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            tabContents.forEach(content => {
+                if (content.id === `problems-panel` && tabId === 'problems') {
+                    content.classList.add('active');
+                    content.style.display = 'flex';
+                } else if (content.id === tabId || (content.id === 'problems-panel' && tabId === 'problems')) {
+                    content.classList.add('active');
+                    content.style.display = 'block';
+                } else {
+                    content.classList.remove('active');
+                    content.style.display = 'none';
+                }
+            });
+        }
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchTerminalTab(btn.getAttribute('data-tab'));
+            });
+        });
+
+        // Run Flow
+        async function runJavaCode() {
+            if (!editorInstance) return;
+
+            const code = editorInstance.getValue();
+            const runBtn = document.getElementById('runBtn');
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
 
             const className = extractClassName(code);
             if (!className) {
-                outputEl.textContent = '❌ Error: Could not find a public class declaration.\n' +
-                    'Make sure your code contains something like:\n' +
-                    'public class MyClass { ... }';
+                setTerminalText('❌ Error: Could not find a public class declaration.\n' +
+                    'Make sure your code contains a public class block, like:\n' +
+                    'public class Main {\n' +
+                    '    public static void main(String[] args) {\n' +
+                    '        ...\n' +
+                    '    }\n' +
+                    '}', true);
                 return;
             }
 
-            outputEl.textContent = '⏳ Compiling and running...';
-            statusEl.textContent = 'Compiling...';
+            // Reset tabs & buffers
+            rawLogsBuffer = "";
+            activeProblems = [];
+            renderProblems();
+            document.getElementById('compiler-logs').textContent = "";
+            document.getElementById('compiler-logs').classList.add('empty');
+            switchTerminalTab('output');
+
+            runBtn.disabled = true;
+            statusDot.className = 'status-dot running';
+            statusText.textContent = 'Compiling...';
+            setTerminalText("⏳ Compiling...\n");
 
             try {
-                // CheerpJ compiles from source string and executes main()
-                outputEl.textContent =
-  "❌ This project uses the old CheerpJ 3 compiler API. The runtime now loads, but compile-from-text must be migrated for CheerpJ 4.";
-statusEl.textContent = "❌ Compiler API needs migration";
-return;
-                // Compilation or runtime error
+                cheerpOSAddStringFile(`/str/${className}.java`, code);
+
+                startInterceptingConsole();
+
+                const compileExitCode = await cheerpjRunMain(
+                    "org.eclipse.jdt.internal.compiler.batch.Main", 
+                    "/app/ecj.jar", 
+                    "-1.8",
+                    "-nowarn",
+                    "-d", "/files",
+                    `/str/${className}.java`
+                );
+
+                stopInterceptingConsole();
+
+                if (compileExitCode !== 0) {
+                    statusDot.className = 'status-dot error';
+                    statusText.textContent = 'Compilation Failed';
+                    appendTerminalText(`\n❌ Compilation failed with exit code: ${compileExitCode}\n`);
+                    
+                    activeProblems = parseCompilerErrors(rawLogsBuffer);
+                    renderProblems();
+                    switchTerminalTab('problems');
+                    runBtn.disabled = false;
+                    return;
+                }
+
+                statusText.textContent = 'Running...';
+                appendTerminalText("🚀 Running class...\n\n");
+
+                startInterceptingConsole();
+                const runExitCode = await cheerpjRunMain(className, "/files");
+                stopInterceptingConsole();
+                
+                statusDot.className = 'status-dot ready';
+                statusText.textContent = 'Java Runtime Ready';
+                
+                if (runExitCode !== 0) {
+                    appendTerminalText(`\n⚠️ Process finished with exit code: ${runExitCode}\n`);
+                } else {
+                    appendTerminalText(`\n✅ Program finished successfully.\n`);
+                }
             } catch (err) {
-                outputEl.textContent = '❌ ' + err.message;
-                statusEl.textContent = '❌ Error';
+                stopInterceptingConsole();
+                statusDot.className = 'status-dot error';
+                statusText.textContent = 'Execution Error';
+                appendTerminalText(`\n❌ Execution encountered an error: ${err.message}\n`);
                 console.error(err);
+            } finally {
+                runBtn.disabled = false;
             }
         }
 
-        // Wire up the button
+        // Horizontal Resizer Dragging
+        const resizer = document.getElementById('terminal-resizer');
+        const terminalPane = document.getElementById('terminal-pane');
+        let isDragging = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const workspaceHeight = document.querySelector('.main-area').getBoundingClientRect().height;
+            const newTerminalHeight = window.innerHeight - e.clientY;
+            
+            if (newTerminalHeight >= 80 && newTerminalHeight <= workspaceHeight * 0.7) {
+                terminalPane.style.height = `${newTerminalHeight}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                if (editorInstance) {
+                    editorInstance.layout();
+                }
+            }
+        });
+
+        // Copy / Clear buttons
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            const activeTab = document.querySelector('.terminal-tab-btn.active').getAttribute('data-tab');
+            let contentText = "";
+            if (activeTab === 'output') {
+                contentText = document.getElementById('output').textContent;
+            } else if (activeTab === 'compiler-logs') {
+                contentText = document.getElementById('compiler-logs').textContent;
+            } else if (activeTab === 'problems') {
+                contentText = activeProblems.map(p => `${p.severity}: ${p.message} at ${p.filename}:${p.line}`).join("\n");
+            }
+            
+            navigator.clipboard.writeText(contentText).then(() => {
+                const copyBtn = document.getElementById('copyBtn');
+                const origText = copyBtn.innerHTML;
+                copyBtn.innerHTML = "Copied!";
+                setTimeout(() => {
+                    copyBtn.innerHTML = origText;
+                }, 1500);
+            });
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            const activeTab = document.querySelector('.terminal-tab-btn.active').getAttribute('data-tab');
+            if (activeTab === 'output') {
+                setTerminalText("", false, true);
+            } else if (activeTab === 'compiler-logs') {
+                rawLogsBuffer = "";
+                document.getElementById('compiler-logs').textContent = "No compilation logs yet.";
+                document.getElementById('compiler-logs').classList.add('empty');
+            } else if (activeTab === 'problems') {
+                activeProblems = [];
+                renderProblems();
+            }
+        });
+
+        // Wire run buttons
         document.getElementById('runBtn').addEventListener('click', runJavaCode);
 
-        // Start loading CheerpJ as soon as the page loads
+        // CheerpJ Loader start
         initCheerpJ();
 
-        // Allow Ctrl+Enter as a shortcut to run
-        document.getElementById('javaCode').addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                e.preventDefault();
-                runJavaCode();
+        // Keyboard Shortcut Bind
+        document.addEventListener('keydown', (e) => {
+            if (autoCompileToggle.checked && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                const runBtn = document.getElementById('runBtn');
+                if (!runBtn.disabled) {
+                    e.preventDefault();
+                    runJavaCode();
+                }
             }
         });
     </script>
